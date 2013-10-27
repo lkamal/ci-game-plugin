@@ -4,12 +4,14 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import hudson.maven.MavenBuild;
 import hudson.model.AbstractBuild;
 import hudson.model.Result;
 import hudson.plugins.cigame.model.RuleResult;
 import hudson.plugins.cigame.rules.unittesting.IncreasingFailedTestsRule;
 import hudson.tasks.test.AbstractTestResultAction;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 @SuppressWarnings("unchecked")
@@ -47,6 +49,8 @@ public class IncreasingFailedTestsRuleTest {
         
         RuleResult result = rule.evaluate(previousBuild, build);
         assertNull("Previous failed build should return null", result);
+//        Assert.assertNotNull(result);
+//        Assert.assertEquals(1 * -10, result.getPoints(), 0.1);
     }
 
     @Test
@@ -79,5 +83,32 @@ public class IncreasingFailedTestsRuleTest {
         
         RuleResult ruleResult = new IncreasingFailedTestsRule(-100).evaluate(previousBuild, build);
         assertNull("Rule result must be null", ruleResult);
+    }
+    
+
+    @Test
+    public void testPreviousBuildFailedButPreviousOfPreviousIsSuccess() throws Exception {
+        IncreasingFailedTestsRule rule = new IncreasingFailedTestsRule(-10);
+        AbstractBuild<?, ?> prePreviousBuild =
+                MavenMultiModuleUnitTestsTest.mockBuild(Result.SUCCESS,
+                        1, 1, 0);
+        AbstractBuild<?, ?> previousBuild = mockBuildWithoutTestResults(Result.FAILURE, prePreviousBuild);
+        AbstractBuild<?, ?> build = 
+            MavenMultiModuleUnitTestsTest.mockBuild(Result.UNSTABLE,
+                    2, 2, 0);
+        
+        RuleResult result = rule.evaluate(previousBuild, build);
+//        assertNull("Previous failed build should return null", result);
+        Assert.assertNotNull(result);
+        Assert.assertEquals(1 * -10, result.getPoints(), 0.1);
+    }
+    
+
+    static AbstractBuild mockBuildWithoutTestResults(Result buildResult, AbstractBuild<?, ?> prePreviousBuild) {
+        AbstractBuild build = mock(MavenBuild.class);
+        when(build.getResult()).thenReturn(buildResult);
+        when(build.getPreviousBuild()).thenReturn(prePreviousBuild);
+        
+        return build;
     }
 }

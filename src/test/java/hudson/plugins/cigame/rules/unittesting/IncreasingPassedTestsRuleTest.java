@@ -75,6 +75,8 @@ public class IncreasingPassedTestsRuleTest {
         
         RuleResult result = rule.evaluate(previousBuild, build);
         Assert.assertNull("Previous failed build should return null", result);
+//        Assert.assertNotNull(result);
+//        Assert.assertEquals(1 * 10, result.getPoints(), 0.1);
     }
 
     @Test

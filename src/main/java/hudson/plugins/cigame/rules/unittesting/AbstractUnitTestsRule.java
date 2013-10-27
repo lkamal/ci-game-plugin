@@ -45,6 +45,7 @@ public abstract class AbstractUnitTestsRule implements AggregatableRule<Integer>
         while(previousBuild != null) {
         	if (previousBuild.getResult() != null) {
 	            if (previousBuild.getResult().isBetterThan(Result.FAILURE)) {
+	                // this is reached if the previous build is a UNSTABLE or SUCCESS
 	                @SuppressWarnings("unchecked")
 	                AbstractTestResultAction action = previousBuild.getTestResultAction();
 	                if (action != null) {
@@ -52,8 +53,10 @@ public abstract class AbstractUnitTestsRule implements AggregatableRule<Integer>
 	                }
 	                // fall through
 	            } else if (previousBuild.getResult().isWorseOrEqualTo(Result.NOT_BUILT)) { 
+	                // this is reached if the previous build is a NOT_BUILT or ABORTED
 	                // fall through
 	            } else {
+	                // this is reached if the previous build is a FAILURE
 	                return previousBuild;
 	            }
         	}
@@ -102,14 +105,69 @@ public abstract class AbstractUnitTestsRule implements AggregatableRule<Integer>
         
         // if the current action is null, let's assume as a ZERO result
         action = action != null ? action : ZERO_RESULT;
-        
-        if ((prevResult.isBetterThan(Result.FAILURE))
-                && (result.isBetterThan(Result.FAILURE))) {
-	        return evaluate(action, prevAction);
+                
+        if ((prevResult.isBetterThan(Result.FAILURE)) && (result.isBetterThan(Result.FAILURE))) {
+            return evaluate(action, prevAction);
+        } else if (isEqualToFailure(prevResult)) {
+            return evaluateWhenPreviousIsFailure(action, previousBuild);
         } else {
         	return null;
         }
 	}
+    
+    /**
+     * When previous build was a failure, loop through the previous ones of that
+     * to reach a better one than failure with test results. Then invoke
+     * evaluate against that build.
+     * 
+     * @param testResult current test results
+     * @param previousBuild
+     * @return
+     */
+    private RuleResult<Integer> evaluateWhenPreviousIsFailure(AbstractTestResultAction<?> testResult,
+                                                              AbstractBuild<?, ?> previousBuild) {
+
+        AbstractBuild<?, ?> previousOfPreviousBuild = getPreviousBetterThanFailureBuildWithTestResults(previousBuild);
+
+        if (previousOfPreviousBuild != null && previousOfPreviousBuild.getTestResultAction() != null) {
+            System.out.println("Evaluating Prev buid id =" + previousBuild.getId() + ", " + previousBuild.getNumber());
+            return evaluate(testResult, previousOfPreviousBuild.getTestResultAction());
+        }
+
+        return null;
+    }
+
+    /**
+     * Checks if the result is a FAILURE (there is no method to compare for
+     * equality of Results).
+     * 
+     * @param prevResult result
+     * @return true if result is FAILURE
+     */
+    private boolean isEqualToFailure(Result prevResult) {
+        return prevResult.isBetterOrEqualTo(Result.FAILURE) && prevResult.isWorseOrEqualTo(Result.FAILURE);
+    }
+
+    /**
+     * Returns the youngest build of status UNSTABLE or SUCCESS which contained
+     * test result.
+     * 
+     * @return the previous build or null if no such build was found
+     */
+    private AbstractBuild<?, ?> getPreviousBetterThanFailureBuildWithTestResults(AbstractBuild<?, ?> previousBuild) {
+        while (previousBuild != null) {
+            System.out.println("Prev buid id =" + previousBuild.getId() + ", " + previousBuild.getNumber());
+            if (previousBuild.getResult() != null && previousBuild.getResult().isBetterThan(Result.FAILURE)) {
+                // this is reached if the previous build is a UNSTABLE or SUCCESS
+                if (previousBuild.getTestResultAction() != null) {
+                    return previousBuild;
+                }
+            }
+            previousBuild = previousBuild.getPreviousBuild();
+        }
+
+        return null;
+    }
     
 	@Override
 	public final RuleResult<?> aggregate(Collection<RuleResult<Integer>> results) {
